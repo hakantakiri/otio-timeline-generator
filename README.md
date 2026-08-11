@@ -77,6 +77,50 @@ python3 generate_timeline.py "/path/to/media-root" \
   --strict
 ```
 
+## Chainable Scripts
+
+`generate_timeline.py` remains the one-shot production command. The `scripts/`
+folder also contains chainable building blocks for future CLI or GUI workflows:
+
+```bash
+python3 scripts/scan-media.py "/path/to/media-root" \
+  --output media_manifest.json
+
+python3 scripts/validate-media-names.py \
+  --manifest media_manifest.json \
+  --output validation_report.json
+
+python3 scripts/plan-timeline-tracks.py \
+  --manifest media_manifest.json \
+  --output track_plan.json \
+  --audio linked
+
+python3 scripts/write-otio-timeline.py \
+  --manifest media_manifest.json \
+  --track-plan track_plan.json \
+  --output generated_timeline.otio
+```
+
+For a one-shot command that invokes those same scripts internally, use:
+
+```bash
+python3 generate_timeline_pipeline.py "/path/to/media-root" \
+  --output generated_timeline.otio
+```
+
+By default, `generate_timeline_pipeline.py` stores intermediate JSON artifacts
+in a temporary directory. Use `--keep-artifacts` or `--artifact-dir DIR` to keep
+`media_manifest.json`, `validation_report.json`, and `track_plan.json`.
+
+The chain writes explicit JSON artifacts between steps:
+
+- `media_manifest_v1` stores probed media, formats, aspect ratios, audio
+  profiles, durations, skipped files, and scan settings.
+- `validation_report_v1` stores same-folder/same-stem collision results and
+  proposed rename targets.
+- `track_plan_v1` stores planned tracks, clips, clip roles, grouping labels, and
+  Resolve link group IDs.
+
 ## Input Folder Shape
 
 The input path is treated as a media root.
