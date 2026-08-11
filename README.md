@@ -1,12 +1,13 @@
 # OTIO Timeline Generator
 
-Generate OpenTimelineIO (`.otio`) timelines from folders of images, videos, and audio files.
+Generate OpenTimelineIO (`.otio`) timelines from folders of images, videos, and
+audio files.
 
-The example script builds a chronological timeline from media folders and groups
-visual tracks by source folder, media type, and normalized aspect ratio. Audio
-tracks are grouped by source folder and audio profile, such as channel layout
-plus sample rate. Generated OTIO files can be imported into tools that support
-OpenTimelineIO, such as DaVinci Resolve.
+The production generator is `generate_timeline.py`. It builds a chronological,
+Resolve-oriented timeline from media folders, groups visual tracks by source
+folder, media type, and normalized aspect ratio, and groups audio tracks by
+source folder and audio profile. Generated OTIO files can be imported into tools
+that support OpenTimelineIO, such as DaVinci Resolve.
 
 ## System Dependencies
 
@@ -47,31 +48,31 @@ uv pip install opentimelineio
 Verify the Python dependency:
 
 ```bash
-python -c "import opentimelineio as otio; print(otio.__version__)"
+python3 -c "import opentimelineio as otio; print(otio.__version__)"
 ```
 
 Python `3.10+` is required because the script uses modern type syntax. Python
 `3.11+` is recommended.
 
-## Run the Example
+## Run the Generator
 
 Show CLI options:
 
 ```bash
-python examples/generate-timeline.py --help
+python3 generate_timeline.py --help
 ```
 
 Generate a timeline:
 
 ```bash
-python examples/generate-timeline.py "/path/to/media-root" \
+python3 generate_timeline.py "/path/to/media-root" \
   --output generated_timeline.otio
 ```
 
 Fail immediately when any media file cannot be probed:
 
 ```bash
-python examples/generate-timeline.py "/path/to/media-root" \
+python3 generate_timeline.py "/path/to/media-root" \
   --output generated_timeline.otio \
   --strict
 ```
@@ -125,8 +126,9 @@ Use this checklist before running against an important media folder:
   renamed.
 - Use `--strict` when media probe failures should stop the run.
 - Use `--quiet` when scripting and you only want the final summary.
-- The default `--audio-mode linked` is the Resolve-safe mode: video files are
-  referenced once and standalone audio files are imported as audio tracks.
+- The default `--audio linked` mode creates Resolve-linked video/audio pairs
+  for video files with embedded audio and imports standalone audio files as
+  audio tracks.
 
 ## Generated Timeline Behavior
 
@@ -134,22 +136,23 @@ Use this checklist before running against an important media folder:
   ratio.
 - Standalone audio tracks are grouped by source folder, audio media type, and
   audio profile.
-- Video media references use timeline-FPS timing for better NLE importer
-  compatibility. Native frame rate is preserved in clip metadata.
-- Embedded audio in video files is left in the source video container by default
-  instead of being split into separate OTIO audio clips.
-- Audio-only files are imported as independent audio clips.
-- Audio media references use timeline-FPS timing for better NLE importer
-  compatibility. Native sample rate is preserved in clip metadata.
-- Timeline placement, gaps, still duration, and timeline metadata use the
+- Video files with embedded audio create paired video and audio OTIO clips that
+  reference the same source file and share `Resolve_OTIO.Link Group ID`.
+- Audio-only files are imported as independent audio clips when `--audio` is
+  `linked` or `standalone`.
+- Timeline placement, gaps, still duration, and clip media ranges use the
   requested timeline FPS.
 - Still images use `--image-duration`.
+- Source media is referenced through absolute file URLs. The default
+  `--file-url-mode resolve` keeps local path spaces unescaped for DaVinci
+  Resolve compatibility; use `--file-url-mode encoded` for standards-style
+  percent-encoded file URIs.
 - Progress is printed to `stderr` while probing media, building tracks, and
   writing the `.otio` file. The final summary is printed to `stdout`.
-- `--audio-mode` can use Resolve-safe linked mode, standalone audio only, no
-  audio tracks, or experimental split embedded audio.
-- Resolution is written as metadata only. Set the project/timeline resolution in
-  the target NLE during or before OTIO import.
+- `--audio` can use Resolve-linked audio pairs, standalone audio only, or no
+  audio tracks.
+- Resolution is not set by OTIO. Set the project/timeline resolution in the
+  target NLE during or before OTIO import.
 
 ## Resolve Embedded-Audio Experiment
 
@@ -157,7 +160,7 @@ Use `examples/resolve-audio-otio-experiment.py` to test whether your Resolve
 version can import one video file as both video and timeline audio:
 
 ```bash
-python examples/resolve-audio-otio-experiment.py \
+python3 examples/resolve-audio-otio-experiment.py \
   samples/2025_08_satipo/iphone/IMG_4950.MOV \
   --output out/resolve_audio_experiment_img_4950.otio
 ```
@@ -165,7 +168,9 @@ python examples/resolve-audio-otio-experiment.py \
 The generated file intentionally contains one video track and one audio track
 that both reference the same `.MOV/.MP4` container. Open it in Raven first, then
 import only this small file into a fresh Resolve project. If Resolve crashes or
-imports video-only, do not use `--audio-mode split-embedded` for full timelines.
+imports video-only, use `generate_timeline.py --audio linked` for the production
+generator and consider FCPXML or Resolve scripting for a stronger linked-audio
+workflow.
 
 ## Resolve Linked Video/Audio OTIO
 
@@ -175,7 +180,7 @@ timeline contains one video clip and one audio clip that reference the same
 source media and share the same Resolve link metadata:
 
 ```bash
-python scripts/create-linked-video-audio-otio.py \
+python3 scripts/create-linked-video-audio-otio.py \
   /path/to/source.mov \
   --output out/linked_video_audio.otio
 ```
@@ -183,13 +188,17 @@ python scripts/create-linked-video-audio-otio.py \
 Videos without embedded audio, such as some drone clips, generate a video-only
 OTIO file without Resolve link metadata.
 
-The script defaults to Resolve-compatible local file URLs, keeping path spaces
-unescaped in `target_url` values. This avoids Resolve import failures with paths
-such as `dji neo`. Use `--file-url-mode encoded` only when you specifically
-want standards-style percent-encoded file URIs for OTIO tooling.
+`generate_timeline.py` uses the same Resolve link metadata for embedded-audio
+videos when `--audio linked` is selected.
 
-This script implements the behavior documented in
-`docs/findings/davinci-resolve-linked-video-audio-otio.md`.
+## Resolve File URL Mode
+
+The generator defaults to Resolve-compatible local file URLs, keeping path
+spaces unescaped in `target_url` values. This avoids Resolve import failures
+with paths such as `dji neo`. Use `--file-url-mode encoded` only when you
+specifically want standards-style percent-encoded file URIs for OTIO tooling.
+
+See `docs/findings/davinci-resolve-file-url-path-encoding-otio.md`.
 
 ## Resolve Same-Stem Media Collisions
 
